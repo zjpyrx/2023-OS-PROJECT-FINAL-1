@@ -14,7 +14,7 @@ main(int argc, char *argv[])
     exit(1);
   }
 
-  if (trace(atoi(argv[1])) < 0) {
+  if (trace(atoi(argv[1])) < 0) { //trace函数返回值小于0，表示跟踪设置失败
     fprintf(2, "%s: trace failed\n", argv[0]);
     exit(1);
   }

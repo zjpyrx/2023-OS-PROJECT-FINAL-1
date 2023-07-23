@@ -26,6 +26,22 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+//新增获取进程数
+int
+proc_getnum(void) {
+  struct proc* p;
+  uint64 count = 0;
+  for (p = proc; p < &proc[NPROC]; p++) {  //遍历所有进程
+    acquire(&p->lock);  //获取锁
+    if (p->state != UNUSED) {
+      count++;
+    }
+    release(&p->lock);  //释放锁
+  }
+  return count;
+}
+
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -288,7 +304,7 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
-
+  np->mask = p->mask;  //新增语句
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 

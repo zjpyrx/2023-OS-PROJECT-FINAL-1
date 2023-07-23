@@ -23,6 +23,21 @@ struct {
   struct run *freelist;
 } kmem;
 
+//新增获取空闲大小
+int
+getfreememSize()
+{
+  struct run* r;
+  int memSize = 0;
+  acquire(&kmem.lock);//获取锁
+  for (r = kmem.freelist; r != 0; r = r->next)
+  {
+    memSize += PGSIZE;
+  }
+  release(&kmem.lock);  //释放锁
+  return memSize;
+}
+
 void
 kinit()
 {
