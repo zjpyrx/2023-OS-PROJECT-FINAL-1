@@ -153,7 +153,13 @@ void            uartputc(int);
 void            uartputc_sync(int);
 int             uartgetc(void);
 
+//kalloc.c
+void            add_rc(uint64);
+void            sub_rc(uint64);
+
+
 // vm.c
+pte_t*          walk(pagetable_t, uint64, int);
 void            kvminit(void);
 void            kvminithart(void);
 void            kvmmap(pagetable_t, uint64, uint64, uint64, int);
