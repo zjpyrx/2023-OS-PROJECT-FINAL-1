@@ -107,9 +107,9 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   //lab4新增
-  int ticks;
-  int tita;
-  void (*handler) ();
+  int ticks; //存储警报间隔(定时器的计时周期)
+  int tita; //在usertrap中记录进程被调度的次数
+  void (*handler) (); //表示信号处理函数的地址
   struct trapframe* copyframe; //缓存trapframe
   int calling; //表示当前是否正在调用中
 };

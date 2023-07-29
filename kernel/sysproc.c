@@ -97,6 +97,7 @@ sys_uptime(void)
   return xticks;
 }
 
+//设置当前进程的闹钟定时器，以便在指定的时间后触发一个 SIGALRM 信号
 uint64
 sys_sigalarm(void)
 {
@@ -104,20 +105,22 @@ sys_sigalarm(void)
   uint64 handler;
   struct proc* p = myproc();
 
-  if (argint(0, &ticks) < 0 || argaddr(1, &handler) < 0)
+  if (argint(0, &ticks) < 0 || argaddr(1, &handler) < 0) //获取ticks和handler的值
     return -1;
-
-  p->ticks = ticks, p->handler = (void (*)())handler;
-
+  //将ticks和handler的值分别存储在proc结构体中的ticks和handler字段中
+  if (ticks == 0 && handler == 0)
+    return 0;
+  p->ticks = ticks;
+  p->handler = (void (*)())handler; 
   return 0;
 }
 
-
+//恢复缓存下来的trapframe
 uint64
 sys_sigreturn(void)
 {
   struct proc* p = myproc();
   memmove(p->trapframe, p->copyframe, sizeof(struct trapframe));
-  p->calling = 0;
+  p->calling = 0; //表示不在调用中
   return 0;
 }
