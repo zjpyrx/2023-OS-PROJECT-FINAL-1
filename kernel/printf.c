@@ -17,6 +17,23 @@
 
 volatile int panicked = 0;
 
+//回溯函数
+void
+backtrace(void)
+{
+  uint64 fp = r_fp();
+  uint64 bottom_of_stack = PGROUNDUP(fp); //栈从高地址向低地址生长，栈底地址为最高地址
+  uint64 return_address;  //返回地址
+
+  printf("backtrace:\n");
+  while (PGROUNDUP(fp) == bottom_of_stack && fp < bottom_of_stack) //确保指针在当前页上，且在最后一个栈帧的最后一个返回地址之前停止循环
+  {
+    return_address = *(uint64*)(fp - 8); //取返回地址
+    fp = *(uint64*)(fp - 16);  //前一帧的指针
+    printf("%p\n", return_address);
+  }
+}
+
 // lock to avoid interleaving concurrent printf's.
 static struct {
   struct spinlock lock;

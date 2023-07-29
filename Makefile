@@ -188,8 +188,8 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-
-
+	$U/_lab4-test-code\
+	$U/_alarmtest\
 
 
 ifeq ($(LAB),$(filter $(LAB), lock))

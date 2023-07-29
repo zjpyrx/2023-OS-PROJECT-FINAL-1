@@ -127,6 +127,12 @@ found:
     return 0;
   }
 
+  //lab4新增
+  if ((p->copyframe = (struct trapframe*)kalloc()) == 0) {
+    release(&p->lock);
+    return 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -156,6 +162,11 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  //lab4新增
+  if (p->trapframe)
+    kfree((void*)p->trapframe);
+  p->trapframe = 0;
+
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -536,7 +547,7 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-
+  
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
