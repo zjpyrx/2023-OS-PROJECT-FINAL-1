@@ -36,10 +36,13 @@ insert(int key, int value, struct entry **p, struct entry *n)
   *p = e;
 }
 
+pthread_mutex_t lock[NBUCKET];  //lab6新增，声明锁
 static 
 void put(int key, int value)
 {
   int i = key % NBUCKET;
+
+  pthread_mutex_lock(&lock[i]);  //lab6新增，获取锁
 
   // is the key already present?
   struct entry *e = 0;
@@ -54,19 +57,21 @@ void put(int key, int value)
     // the new is new.
     insert(key, value, &table[i], table[i]);
   }
-
+  pthread_mutex_unlock(&lock[i]);  //lab6新增，释放锁
 }
-
 static struct entry*
 get(int key)
 {
   int i = key % NBUCKET;
 
+  pthread_mutex_lock(&lock[i]);  //lab6新增，获取锁
 
   struct entry *e = 0;
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key) break;
   }
+
+  pthread_mutex_unlock(&lock[i]);  //lab6新增，释放锁
 
   return e;
 }
@@ -144,7 +149,11 @@ main(int argc, char *argv[])
     assert(pthread_join(tha[i], &value) == 0);
   }
   t1 = now();
-
+  /***********lab6新增，初始化锁*********************************************/
+  for (int i = 0; i < NBUCKET; i++) {
+    pthread_mutex_init(&lock[i], NULL);
+  }
+  /********************************************************/
   printf("%d gets, %.3f seconds, %.0f gets/second\n",
          NKEYS*nthread, t1 - t0, (NKEYS*nthread) / (t1 - t0));
 }

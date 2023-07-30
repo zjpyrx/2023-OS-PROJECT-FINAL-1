@@ -31,6 +31,19 @@ barrier()
   // then increment bstate.round.
   //
   
+  pthread_mutex_lock(&bstate.barrier_mutex);  //获取锁  
+  bstate.nthread++;  //计数器增加，表示有一个线程调用了barrier()  
+
+  if (bstate.nthread == nthread) {  //所有线程都调用了barrier()，重置计数器并增加轮数
+    bstate.nthread = 0;
+    bstate.round++;    
+    pthread_cond_broadcast(&bstate.barrier_cond);//广播条件变量，唤醒所有等待的线程
+  }
+  else {  //如果还有线程没有调用barrier()函数，则等待其他线程调用
+    pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+  }
+
+  pthread_mutex_unlock(&bstate.barrier_mutex);
 }
 
 static void *
