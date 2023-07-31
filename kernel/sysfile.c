@@ -16,6 +16,8 @@
 #include "file.h"
 #include "fcntl.h"
 
+
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -283,6 +285,43 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+//跟随符号链接获取最终的目标路径
+static struct inode* follow_symlink(struct inode* ip) {
+  uint inums[NSYMLINK];
+  int i, j;
+  char target[MAXPATH];
+
+  for (i = 0; i < NSYMLINK; ++i) { //循环遍历符号链接，最多遍历NSYMLINK个符号链接
+    inums[i] = ip->inum;    
+    if (readi(ip, 0, (uint64)target, 0, MAXPATH) <= 0) {  //从符号链接文件中读取目标路径
+      iunlockput(ip);
+      printf("open_symlink: open symlink failed\n");
+      return 0;
+    }
+    iunlockput(ip);
+  
+    if ((ip = namei(target)) == 0) {  //获取目标路径的inode结构体指针ip
+      printf("open_symlink: path \"%s\" is not exist\n", target);
+      return 0;
+    }
+    for (j = 0; j <= i; ++j) {  //遍历inums数组，检测是否存在循环。
+      if (ip->inum == inums[j]) {
+        printf("open_symlink: links form a cycle\n");
+        return 0;
+      }
+    }
+    ilock(ip); //将目标路径的inode上锁
+    if (ip->type != T_SYMLINK) {  //检查类型,不是符号链接类型，则说明找到目标。如果是，则继续遍历
+      return ip;
+    }
+  }
+
+  iunlockput(ip);
+  printf("open_symlink: the depth of links reaches the limit\n");
+  return 0;
+}
+
+
 uint64
 sys_open(void)
 {
@@ -321,6 +360,17 @@ sys_open(void)
     end_op();
     return -1;
   }
+
+  /********lab9新增**********************************************************************/
+  if (ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0) { //如果没有设置O_NOFOLLOW标志
+    if ((ip = follow_symlink(ip)) == 0) { //调用follow_symlink函数跟随符号链接获取目标路径
+      //此处不用释放锁！！在follow_symlinktest()返回失败时ip的锁在函数内已经被释放
+      //iunlockput(ip);
+      end_op();
+      return -1;
+    }
+  }
+  /*************************************************************************************/
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
@@ -484,3 +534,37 @@ sys_pipe(void)
   }
   return 0;
 }
+
+
+//lab9新增
+uint64 sys_symlink(void) {
+  char target[MAXPATH], path[MAXPATH];
+  struct inode* ip;
+  int n;
+
+  //从用户态获取符号链接的目标路径和符号链接的路径
+  if ((n = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0) {
+    return -1;
+  }
+
+  begin_op(); //开始系统调用
+
+  //用create函数创建一个新的符号链接文件，并将inode结构体指针存储在ip中。
+  if ((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
+    end_op();
+    return -1;
+  }
+
+  //用writei函数将目标路径写入新创建的符号链接文件的inode中。
+  if (writei(ip, 0, (uint64)target, 0, n) != n) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);  //解锁inode，使其回到inode池
+  end_op();
+  return 0;
+}
+
+
