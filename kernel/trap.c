@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -15,6 +16,18 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+
+struct file {
+  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
+  int ref; // reference count
+  char readable;
+  char writable;
+  struct pipe* pipe; // FD_PIPE
+  struct inode* ip;  // FD_INODE and FD_DEVICE
+  uint off;          // FD_INODE
+  short major;       // FD_DEVICE
+};
+
 
 void
 trapinit(void)
@@ -29,20 +42,6 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
-#define PROT_READ 1
-#define PROT_WRITE 2
-#define PROT_EXEC 4
-
-struct file {
-  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
-  int ref; // reference count
-  char readable;
-  char writable;
-  struct pipe* pipe; // FD_PIPE
-  struct inode* ip;  // FD_INODE and FD_DEVICE
-  uint off;          // FD_INODE
-  short major;       // FD_DEVICE
-};
 
 //
 // handle an interrupt, exception, or system call from user space.
@@ -85,21 +84,23 @@ usertrap(void)
   } 
   
   /******lab10新增***************************************************/
-  else if (r_scause() == 13 || r_scause() == 15) {
+  else if (r_scause() == 13 || r_scause() == 15) { //访问异常（读/写地址无效或权限不足）
     uint64 va = r_stval();
-    if (va >= p->sz || va > MAXVA || PGROUNDUP(va) == PGROUNDDOWN(p->trapframe->sp)) p->killed = 1;
+    //如果虚拟地址大于等于进程的结束地址，或者超出了进程的最大虚拟地址空间，或者与栈地址对齐，就认为进程出错
+    if (va >= p->sz || va > MAXVA || PGROUNDUP(va) == PGROUNDDOWN(p->trapframe->sp))
+      p->killed = 1;
     else {
       struct vma* vma = 0;
-      for (int i = 0; i < VMASIZE; i++) {
+      for (int i = 0; i < VMASIZE; i++) { //遍历进程的 VMA 数组，寻找包含虚拟地址的映射区域。找到了更新指针，跳出循环。
         if (p->vma[i].used == 1 && va >= p->vma[i].addr && va < p->vma[i].addr + p->vma[i].length) {
           vma = &p->vma[i];
           break;
         }
       }
       if (vma) {
-        va = PGROUNDDOWN(va);
-        uint64 offset = va - vma->addr;
-        uint64 mem = (uint64)kalloc();
+        va = PGROUNDDOWN(va); //虚拟地址向下对齐，按照页大小对齐
+        uint64 offset = va - vma->addr; //计算偏移量
+        uint64 mem = (uint64)kalloc(); //分配一个物理页面，在后续把内容读入其中
         if (mem == 0) {
           p->killed = 1;
         }
@@ -112,7 +113,7 @@ usertrap(void)
           if (vma->prot & PROT_READ) flag |= PTE_R;
           if (vma->prot & PROT_WRITE) flag |= PTE_W;
           if (vma->prot & PROT_EXEC) flag |= PTE_X;
-          if (mappages(p->pagetable, va, PGSIZE, mem, flag) != 0) {
+          if (mappages(p->pagetable, va, PGSIZE, mem, flag) != 0) { //用户态、可读、可写和可执行权限
             kfree((void*)mem);
             p->killed = 1;
           }
@@ -121,8 +122,6 @@ usertrap(void)
     }
   }
   /***********************************************************/
-  
-  
   
   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

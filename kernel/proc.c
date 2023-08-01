@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -313,6 +314,7 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+
   //lab10新增
   for (int i = 0; i < VMASIZE; i++) {
     if (p->vma[i].used) {
@@ -341,7 +343,7 @@ reparent(struct proc *p)
   }
 }
 
-#define MAP_SHARED 1
+
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
@@ -363,6 +365,7 @@ exit(int status)
     }
   }
 
+  //lab10新增
   for (int i = 0; i < VMASIZE; i++) {
     if (p->vma[i].used) {
       if (p->vma[i].flags & MAP_SHARED)
