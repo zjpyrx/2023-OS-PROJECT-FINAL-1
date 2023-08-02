@@ -1,3 +1,4 @@
+（具体内容和图片写在报告里）
 1. 编译`user/call.c`文件，生成`user/call.asm`文件。其中与call中的main，printf，f，g函数如下图所示：
 
    ![image-20230727223913735](assets/image-20230727223913735.png)
