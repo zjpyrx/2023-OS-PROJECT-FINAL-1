@@ -101,8 +101,29 @@ e1000_transmit(struct mbuf *m)
   // the mbuf contains an ethernet frame; program it into
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
-  //
+  //  
+  acquire(&e1000_lock); //获取网卡锁
+  uint32 next_index = regs[E1000_TDT];   //获取下一个要发送的环的索引
+
+  //E1000_TDT索引的描述符中没有设置E1000_TXD_STAT_DD，说明没有完成发送，则释放锁并返回  
+  if ((tx_ring[next_index].status & E1000_TXD_STAT_DD) == 0) { 
+    release(&e1000_lock);
+    return -1;
+  }
+
+  //释放从该描述符传输的最后一个 mbuf（如果有）
+  if (tx_mbufs[next_index])
+    mbuffree(tx_mbufs[next_index]);
+
+  //填写描述符
+  tx_ring[next_index].addr = (uint64)m->head; //内存中数据包的内容
+  tx_ring[next_index].length = (uint16)m->len;
+  tx_ring[next_index].cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS; //设置EOP和RS
+  tx_mbufs[next_index] = m;
+
+  regs[E1000_TDT] = (next_index + 1) % TX_RING_SIZE;   //更新下一个环的位置
   
+  release(&e1000_lock);//释放网卡锁
   return 0;
 }
 
@@ -115,6 +136,24 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+  uint32 next_index = (regs[E1000_RDT] + 1) % RX_RING_SIZE; //获取e1000_RDT寄存器，并将其加1后对RX_RING_SIZE取模，询问下一个要读取的环索引。
+  
+  while (rx_ring[next_index].status & E1000_RXD_STAT_DD) { //循环检查描述符status部分中的E1000_RXD_STAT_DD位是否为完成状态。
+    if (rx_ring[next_index].length > MBUF_SIZE) { //检查数据包的长度
+      panic("MBUF_SIZE OVERFLOW!");
+    }
+
+    //将 mbuf 的m->len更新为描述符中报告的长度，使用net_rx()将 mbuf 传递到网络堆栈。
+    rx_mbufs[next_index]->len = rx_ring[next_index].length;
+    net_rx(rx_mbufs[next_index]);
+
+    rx_mbufs[next_index] = mbufalloc(0); //分配一个新的 mbuf，替换上一个
+    rx_ring[next_index].addr = (uint64)rx_mbufs[next_index]->head; //将该mbuf的头指针存储在RXD的addr字段中
+    rx_ring[next_index].status = 0;
+
+    next_index = (next_index + 1) % RX_RING_SIZE;  //更新下一个环的位置
+  }
+  regs[E1000_RDT] = (next_index - 1) % RX_RING_SIZE; //将RDT寄存器的值设置为下一个要读取的RXD的索引减1，以便在下一个数据包到达时使用。
 }
 
 void
