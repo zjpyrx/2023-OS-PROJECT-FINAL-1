@@ -101,17 +101,31 @@ sys_uptime(void)
 uint64
 sys_sigalarm(void)
 {
-  int ticks;
-  uint64 handler;
-  struct proc* p = myproc();
+  //int ticks;
+  //uint64 handler;
+  //struct proc* p = myproc();
 
-  if (argint(0, &ticks) < 0 || argaddr(1, &handler) < 0) //获取ticks和handler的值
+  //if (argint(0, &ticks) < 0 || argaddr(1, &handler) < 0) //获取ticks和handler的值
+  //  return -1;
+  ////将ticks和handler的值分别存储在proc结构体中的ticks和handler字段中
+  //if (ticks == 0 && handler == 0)
+  //  return 0;
+  //p->ticks = ticks;
+  //p->handler = (void (*)())handler; 
+  //return 0;
+  int interval;
+  uint64 handler;
+  struct proc* p;
+  // 要求时间间隔非负
+  if (argint(0, &interval) < 0 || argaddr(1, &handler) < 0 || interval < 0) {
     return -1;
-  //将ticks和handler的值分别存储在proc结构体中的ticks和handler字段中
-  if (ticks == 0 && handler == 0)
-    return 0;
-  p->ticks = ticks;
-  p->handler = (void (*)())handler; 
+  }
+  // lab4-3
+  p = myproc();
+  p->interval = interval;
+  p->handler = handler;
+  p->passedticks = 0;    // 重置过去时钟数
+
   return 0;
 }
 
@@ -119,8 +133,17 @@ sys_sigalarm(void)
 uint64
 sys_sigreturn(void)
 {
+  //struct proc* p = myproc();
+  //memmove(p->trapframe, p->copyframe, sizeof(struct trapframe));
+  //p->calling = 0; //表示不在调用中
+  //return 0;
   struct proc* p = myproc();
-  memmove(p->trapframe, p->copyframe, sizeof(struct trapframe));
-  p->calling = 0; //表示不在调用中
+  // trapframecopy must have the copy of trapframe
+  if (p->trapframecopy != p->trapframe + 512) {
+    return -1;
+  }
+  memmove(p->trapframe, p->trapframecopy, sizeof(struct trapframe));   // restore the trapframe
+  p->passedticks = 0;     // prevent re-entrant
+  p->trapframecopy = 0;    // 置零
   return 0;
 }

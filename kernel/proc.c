@@ -127,11 +127,11 @@ found:
     return 0;
   }
 
-  //lab4新增
-  if ((p->copyframe = (struct trapframe*)kalloc()) == 0) {
-    release(&p->lock);
-    return 0;
-  }
+  ////lab4新增
+  //if ((p->copyframe = (struct trapframe*)kalloc()) == 0) {
+  //  release(&p->lock);
+  //  return 0;
+  //}
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -146,6 +146,10 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  p->interval = 0;
+  p->handler = 0;
+  p->passedticks = 0;
+  p->trapframecopy = 0;
 
   return p;
 }
