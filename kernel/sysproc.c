@@ -101,30 +101,18 @@ sys_uptime(void)
 uint64
 sys_sigalarm(void)
 {
-  //int ticks;
-  //uint64 handler;
-  //struct proc* p = myproc();
-
-  //if (argint(0, &ticks) < 0 || argaddr(1, &handler) < 0) //获取ticks和handler的值
-  //  return -1;
-  ////将ticks和handler的值分别存储在proc结构体中的ticks和handler字段中
-  //if (ticks == 0 && handler == 0)
-  //  return 0;
-  //p->ticks = ticks;
-  //p->handler = (void (*)())handler; 
-  //return 0;
   int interval;
   uint64 handler;
   struct proc* p;
-  // 要求时间间隔非负
-  if (argint(0, &interval) < 0 || argaddr(1, &handler) < 0 || interval < 0) {
+
+  if (argint(0, &interval) < 0 || argaddr(1, &handler) < 0 || interval < 0) {   //时间间隔非负
     return -1;
   }
-  // lab4-3
+  //将interval和handler的值分别存储在proc结构体中的interval和handler字段中
   p = myproc();
   p->interval = interval;
   p->handler = handler;
-  p->passedticks = 0;    // 重置过去时钟数
+  p->passedticks = 0;    //重置调度次数
 
   return 0;
 }
