@@ -19,15 +19,15 @@ struct run {
 };
 
 struct {
-  struct spinlock lock;
-  struct run *freelist;
-} kmem[NCPU]; //lab8更改，拆分freelist
+  struct spinlock lock[NCPU];
+  struct run *freelist[NCPU];
+} kmem; //lab8更改，拆分freelist
 
 void
 kinit()
 {
   for (int i = 0; i < NCPU; i++)
-    initlock(&kmem[i].lock, "kmem");  //lab8更改
+    initlock(&kmem.lock[i], "kmem");  //lab8更改
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -63,10 +63,11 @@ kfree(void *pa)
   pop_off(); //开启中断
   /*****************************************************************/
 
-  acquire(&kmem[id].lock);
-  r->next = kmem[id].freelist;
-  kmem[id].freelist = r;
-  release(&kmem[id].lock);
+  //lab8修改
+  acquire(&kmem.lock[id]);
+  r->next = kmem.freelist[id];
+  kmem.freelist[id] = r;
+  release(&kmem.lock[id]);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -81,23 +82,24 @@ kalloc(void)
   int id = cpuid();
   pop_off();
 
-  acquire(&kmem[id].lock);
-  r = kmem[id].freelist;
+  acquire(&kmem.lock[id]);
+  r = kmem.freelist[id];
   if (r) {
-    kmem[id].freelist = r->next;
+    kmem.freelist[id] = r->next;
   }
   else {  //如果当前CPU的空闲内存块链表为空，则从其他CPU的空闲内存块链表中寻找可用内存块
     for (int i = 0; i < NCPU; i++) {
       if (i == id) continue;
-      acquire(&kmem[i].lock);
-      r = kmem[i].freelist;
+      acquire(&kmem.lock[i]);
+      r = kmem.freelist[i];
       if (r)  //找到可用块
-        kmem[i].freelist = r->next; //更新链表头指针
-      release(&kmem[i].lock);
-      if (r) break;
+        kmem.freelist[i] = r->next; //更新链表头指针
+      release(&kmem.lock[i]);
+      if (r) 
+        break;
     }
   }
-  release(&kmem[id].lock);
+  release(&kmem.lock[id]);
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk

@@ -8,6 +8,6 @@ struct buf {
   struct buf *prev; // LRU cache list
   struct buf *next;
   uchar data[BSIZE];
-  uint lastuse;  //保存该缓存块上一次被访问的时间戳
+  uint timestamp;  //保存该缓存块上一次被访问的时间戳
 };
 
